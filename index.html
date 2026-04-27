@@ -259,7 +259,33 @@ body::before {
   background:var(--code-bg); border-top:1px solid var(--border); border-bottom:1px solid var(--border);
 }
 
-/* ── TEXT ANSWER AREA (Theory / Warmup) ── */
+/* ── INSTRUCTION BANNER ── */
+.instruction-banner {
+  background:rgba(108,99,255,0.08); border:1px solid rgba(108,99,255,0.25);
+  border-radius:12px; padding:14px 18px; margin-bottom:20px;
+  font-size:12px; line-height:1.7; color:var(--text);
+}
+.instruction-banner strong { color:var(--accent); }
+
+/* ── FINISH BUTTON AT BOTTOM ── */
+.finish-wrap {
+  padding:32px 0 8px; display:flex; flex-direction:column; align-items:center; gap:10px;
+}
+.btn-finish-big {
+  width:100%; max-width:500px; padding:18px 32px;
+  border-radius:14px; font-family:'Unbounded',sans-serif;
+  font-size:13px; font-weight:700; cursor:pointer; border:none;
+  transition:all 0.3s; letter-spacing:0.5px;
+  background:var(--surface2); color:var(--muted);
+  border:2px solid var(--border);
+}
+.btn-finish-big.ready {
+  background:var(--accent3); color:#000;
+  border-color:var(--accent3);
+  box-shadow:0 0 30px rgba(67,233,123,0.3);
+}
+.btn-finish-big.ready:hover { background:#5cf592; transform:translateY(-2px); }
+.finish-hint { font-size:11px; color:var(--muted); text-align:center; }
 .text-answer-wrap { border-top:1px solid var(--border); }
 .text-answer-label {
   padding:8px 18px; font-size:9px; letter-spacing:2px;
@@ -327,7 +353,7 @@ body::before {
   background:var(--surface); border:1px solid var(--border);
   border-radius:14px; margin-bottom:10px; overflow:hidden;
 }
-.acard.done-card { border-color:rgba(67,233,123,0.3); }
+.acard.done-card { border-color:var(--border); }
 .acard-top {
   padding:14px 18px; cursor:pointer;
   display:flex; align-items:flex-start; gap:12px;
@@ -418,7 +444,7 @@ body::before {
     <div class="rstat"><div class="rstat-num" id="r-warmup">0</div><div class="rstat-label">Warmup</div></div>
     <div class="rstat"><div class="rstat-num" id="r-theory">0</div><div class="rstat-label">Theory</div></div>
   </div>
-  <div class="tg-note" id="tgNote">📬 Отправляю результаты...</div>
+  <div class="tg-note" id="tgNote" style="display:none"></div>
   <div class="btn-row">
     <button class="btn btn-success" onclick="showAnswers()">Посмотреть ответы →</button>
     <button class="btn btn-ghost" onclick="newSession()">Новая сессия</button>
@@ -466,11 +492,24 @@ function showScreen(id){
 
 function toast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),3000); }
 
+function countFilled(){
+  return Object.values(userAnswers).filter(v => v && v.trim().length > 0).length;
+}
+
 function updateProgress(){
-  const pct = totalCards>0 ? Math.round(checked.size/totalCards*100) : 0;
-  document.getElementById('progLabel').textContent=checked.size+' / '+totalCards;
+  const filled = countFilled();
+  const pct = totalCards>0 ? Math.round(filled/totalCards*100) : 0;
+  document.getElementById('progLabel').textContent=filled+' / '+totalCards;
   document.getElementById('progPct').textContent=pct+'%';
   document.getElementById('progFill').style.width=pct+'%';
+
+  const btn = document.getElementById('bigFinishBtn');
+  const hint = document.getElementById('finishHint');
+  if(!btn) return;
+  const allFilled = filled >= totalCards;
+  btn.disabled = !allFilled;
+  btn.classList.toggle('ready', allFilled);
+  if(hint) hint.style.display = allFilled ? 'none' : '';
 }
 
 // ── SWIFT SYNTAX HIGHLIGHT ─────────────────────────────────────────
@@ -529,13 +568,8 @@ function loadState(){
       const el = document.getElementById('ed-'+id);
       if(el) el.value = val;
     });
-    // restore done states
-    checked.forEach(id => {
-      const card = document.getElementById('qc-'+id);
-      const chk  = document.getElementById('chk-'+id);
-      if(card) card.classList.add('done');
-      if(chk)  chk.classList.add('checked');
-    });
+    // re-run updateProgress after restoring values so button state is correct
+    updateProgress();
 
     const screen = state.screen;
     if(screen === 's-session'){
@@ -609,6 +643,12 @@ function renderSession(){
   const body = document.getElementById('sessBody');
   body.innerHTML='';
 
+  // INSTRUCTION BANNER
+  const banner = document.createElement('div');
+  banner.className = 'instruction-banner';
+  banner.innerHTML = `<strong>Важно:</strong> заполни все поля — по каждому вопросу напиши ответ. Если не знаешь — порассуждай вслух или напиши <em>«не знаю»</em>. Кнопка завершения станет активной, когда все поля заполнены.`;
+  body.appendChild(banner);
+
   // WARMUP
   body.appendChild(renderSection('🔥','Warmup',session.warmup.length));
   session.warmup.forEach((q,i)=>{
@@ -632,10 +672,6 @@ function renderSession(){
             oninput="saveAnswer('${q.id}',this.value)"
             onkeydown="handleTab(event)"></textarea>
         </div>
-      </div>
-      <div class="mark-row">
-        <div class="mark-chk" id="chk-${q.id}" onclick="toggleDone('${q.id}')"></div>
-        <span class="mark-label" onclick="toggleDone('${q.id}')">Отметить как выполненное</span>
       </div>`;
     body.appendChild(card);
   });
@@ -658,10 +694,6 @@ function renderSession(){
         <textarea class="text-answer" id="ed-${q.id}" spellcheck="true"
           placeholder="Напиши свой ответ здесь..."
           oninput="saveAnswer('${q.id}',this.value)"></textarea>
-      </div>
-      <div class="mark-row">
-        <div class="mark-chk" id="chk-${q.id}" onclick="toggleDone('${q.id}')"></div>
-        <span class="mark-label" onclick="toggleDone('${q.id}')">Отметить как выполненное</span>
       </div>`;
     tDiv.appendChild(card);
   });
@@ -698,18 +730,20 @@ function renderSession(){
             oninput="saveAnswer('${t.id}',this.value)"
             onkeydown="handleTab(event)"></textarea>
         </div>
-      </div>
-      <div class="mark-row">
-        <div class="mark-chk" id="chk-${t.id}" onclick="toggleDone('${t.id}')"></div>
-        <span class="mark-label" onclick="toggleDone('${t.id}')">Отметить как выполненное</span>
       </div>`;
     tkDiv.appendChild(card);
   });
   body.appendChild(tkDiv);
 
-  // bottom padding
-  const pad=document.createElement('div'); pad.style.height='40px';
-  body.appendChild(pad);
+  // bottom padding + big finish button
+  const finishWrap = document.createElement('div');
+  finishWrap.className = 'finish-wrap';
+  finishWrap.innerHTML = `
+    <button class="btn-finish-big" id="bigFinishBtn" onclick="confirmFinish()" disabled>
+      Завершить сессию →
+    </button>
+    <div class="finish-hint" id="finishHint">Заполни все поля чтобы завершить</div>`;
+  body.appendChild(finishWrap);
 }
 
 // ── INTERACTIONS ───────────────────────────────────────────────────
@@ -724,7 +758,7 @@ function toggleDone(id){
   saveState();
 }
 
-function saveAnswer(id, val){ userAnswers[id] = val; saveState(); }
+function saveAnswer(id, val){ userAnswers[id] = val; updateProgress(); saveState(); }
 
 function handleTab(e){
   if(e.key==='Tab'){
@@ -741,28 +775,34 @@ function confirmFinish(){
 
 // ── FINISH ─────────────────────────────────────────────────────────
 function finishSession(){
-  const wDone = session.warmup.filter(q=>checked.has(q.id)).length;
-  const tDone = session.theory.filter(q=>checked.has(q.id)).length;
-  const kDone = session.tasks.filter(t=>checked.has(t.id)).length;
-  const pct   = totalCards>0 ? Math.round(checked.size/totalCards*100) : 0;
+  const allIds = [
+    ...session.warmup.map(q=>q.id),
+    ...session.theory.map(q=>q.id),
+    ...session.tasks.map(t=>t.id)
+  ];
+  const wFilled = session.warmup.filter(q=>(userAnswers[q.id]||'').trim()).length;
+  const tFilled = session.theory.filter(q=>(userAnswers[q.id]||'').trim()).length;
+  const kFilled = session.tasks.filter(t=>(userAnswers[t.id]||'').trim()).length;
+  const totalFilled = wFilled + tFilled + kFilled;
+  const pct = totalCards>0 ? Math.round(totalFilled/totalCards*100) : 0;
 
   let emoji='🎯', title='Сессия завершена!', sub='';
-  if(pct===100){emoji='🏆';title='Идеально!';sub='Все вопросы отмечены выполненными ✓';}
-  else if(pct>=70){emoji='💪';sub=pct+'% выполнено — отличная работа!';}
-  else if(pct>=40){emoji='📈';sub=pct+'% выполнено — есть куда расти!';}
-  else{emoji='🌱';sub=pct+'% выполнено — продолжай тренироваться!';}
+  if(pct===100){emoji='🏆';title='Отлично!';sub='Все вопросы заполнены ✓';}
+  else if(pct>=70){emoji='💪';sub=pct+'% вопросов заполнено — хорошая работа!';}
+  else if(pct>=40){emoji='📈';sub=pct+'% вопросов заполнено — есть куда расти!';}
+  else{emoji='🌱';sub=pct+'% вопросов заполнено — продолжай тренироваться!';}
 
   document.getElementById('resEmoji').textContent=emoji;
   document.getElementById('resTitle').textContent=title;
   document.getElementById('resSub').textContent=sub;
-  document.getElementById('r-checked').textContent=checked.size;
+  document.getElementById('r-checked').textContent=totalFilled;
   document.getElementById('r-total').textContent=totalCards;
-  document.getElementById('r-warmup').textContent=wDone+'/'+session.warmup.length;
-  document.getElementById('r-theory').textContent=tDone+'/'+session.theory.length;
+  document.getElementById('r-warmup').textContent=wFilled+'/'+session.warmup.length;
+  document.getElementById('r-theory').textContent=tFilled+'/'+session.theory.length;
 
   showScreen('s-result');
   saveState();
-  sendTelegram(wDone, tDone, kDone, pct);
+  sendTelegram(wFilled, tFilled, kFilled, pct);
 }
 
 // ── ANSWERS SCREEN ─────────────────────────────────────────────────
@@ -860,9 +900,15 @@ async function sendTelegram(wDone,tDone,kDone,pct){
       body:JSON.stringify({chat_id:CHAT_ID,text:msg,parse_mode:'Markdown'})
     });
     const d=await r.json();
-    document.getElementById('tgNote').textContent=d.ok?'✅ Результаты отправлены в Telegram!':'⚠️ Не удалось отправить результаты.';
+    if(d.ok){
+      const note = document.getElementById('tgNote');
+      note.textContent='✅ Результаты отправлены в Telegram!';
+      note.style.display='';
+    } else {
+      document.getElementById('tgNote').style.display='none';
+    }
   }catch(e){
-    document.getElementById('tgNote').textContent='⚠️ Ошибка отправки.';
+    document.getElementById('tgNote').style.display='none';
   }
 }
 
