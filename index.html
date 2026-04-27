@@ -574,28 +574,27 @@ function loadState(){
     const screen = state.screen;
     if(screen === 's-session'){
       showScreen('s-session');
-    } else if(screen === 's-result'){
+    } else if(screen === 's-result' || screen === 's-answers'){
       // rebuild result screen without re-sending telegram
-      const wDone = session.warmup.filter(q=>checked.has(q.id)).length;
-      const tDone = session.theory.filter(q=>checked.has(q.id)).length;
-      const kDone = session.tasks.filter(t=>checked.has(t.id)).length;
-      const pct   = totalCards>0 ? Math.round(checked.size/totalCards*100) : 0;
+      const wFilled = session.warmup.filter(q=>(userAnswers[q.id]||'').trim()).length;
+      const tFilled = session.theory.filter(q=>(userAnswers[q.id]||'').trim()).length;
+      const kFilled = session.tasks.filter(t=>(userAnswers[t.id]||'').trim()).length;
+      const totalFilled = wFilled + tFilled + kFilled;
+      const pct = totalCards>0 ? Math.round(totalFilled/totalCards*100) : 0;
       let emoji='🎯', title='Сессия завершена!', sub='';
-      if(pct===100){emoji='🏆';title='Идеально!';sub='Все вопросы отмечены выполненными ✓';}
-      else if(pct>=70){emoji='💪';sub=pct+'% выполнено — отличная работа!';}
-      else if(pct>=40){emoji='📈';sub=pct+'% выполнено — есть куда расти!';}
-      else{emoji='🌱';sub=pct+'% выполнено — продолжай тренироваться!';}
+      if(pct===100){emoji='🏆';title='Отлично!';sub='Все вопросы заполнены ✓';}
+      else if(pct>=70){emoji='💪';sub=pct+'% вопросов заполнено — хорошая работа!';}
+      else if(pct>=40){emoji='📈';sub=pct+'% вопросов заполнено — есть куда расти!';}
+      else{emoji='🌱';sub=pct+'% вопросов заполнено — продолжай тренироваться!';}
       document.getElementById('resEmoji').textContent=emoji;
       document.getElementById('resTitle').textContent=title;
       document.getElementById('resSub').textContent=sub;
-      document.getElementById('r-checked').textContent=checked.size;
+      document.getElementById('r-checked').textContent=totalFilled;
       document.getElementById('r-total').textContent=totalCards;
-      document.getElementById('r-warmup').textContent=wDone+'/'+session.warmup.length;
-      document.getElementById('r-theory').textContent=tDone+'/'+session.theory.length;
-      document.getElementById('tgNote').textContent='';
+      document.getElementById('r-warmup').textContent=wFilled+'/'+session.warmup.length;
+      document.getElementById('r-theory').textContent=tFilled+'/'+session.theory.length;
+      document.getElementById('tgNote').style.display='none';
       showScreen('s-result');
-    } else if(screen === 's-answers'){
-      showAnswers();
     } else {
       showScreen('s-session');
     }
@@ -646,7 +645,7 @@ function renderSession(){
   // INSTRUCTION BANNER
   const banner = document.createElement('div');
   banner.className = 'instruction-banner';
-  banner.innerHTML = `<strong>Важно:</strong> заполни все поля — по каждому вопросу напиши ответ. Если не знаешь — порассуждай вслух или напиши <em>«не знаю»</em>. Кнопка завершения станет активной, когда все поля заполнены.`;
+  banner.innerHTML = `<strong>Важно:</strong> заполни все поля — по каждому вопросу напиши ответ. Если не знаешь — порассуждай или напиши <em>«не знаю»</em>. Кнопка завершения станет активной, когда все поля заполнены.`;
   body.appendChild(banner);
 
   // WARMUP
@@ -801,7 +800,7 @@ function finishSession(){
   document.getElementById('r-theory').textContent=tFilled+'/'+session.theory.length;
 
   showScreen('s-result');
-  saveState();
+  clearState();
   sendTelegram(wFilled, tFilled, kFilled, pct);
 }
 
@@ -871,7 +870,7 @@ function showAnswers(){
   const pad=document.createElement('div'); pad.style.height='40px';
   body.appendChild(pad);
   showScreen('s-answers');
-  saveState();
+  // не сохраняем s-answers в state — при перезагрузке вернёмся на s-result
 }
 
 function toggleAcard(id){
