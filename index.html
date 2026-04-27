@@ -259,6 +259,26 @@ body::before {
   background:var(--code-bg); border-top:1px solid var(--border); border-bottom:1px solid var(--border);
 }
 
+/* ── TEXT ANSWER AREA (Theory / Warmup) ── */
+.text-answer-wrap { border-top:1px solid var(--border); }
+.text-answer-label {
+  padding:8px 18px; font-size:9px; letter-spacing:2px;
+  text-transform:uppercase; color:var(--muted);
+  background:var(--surface2); border-bottom:1px solid var(--border);
+  display:flex; align-items:center; justify-content:space-between;
+}
+.text-answer-label span:first-child { color:var(--accent); }
+.text-answer {
+  width:100%; min-height:80px;
+  background:var(--surface2); color:var(--text);
+  border:none; outline:none; resize:vertical;
+  padding:14px 18px;
+  font-family:'JetBrains Mono',monospace; font-size:12px; line-height:1.7;
+  caret-color:#fff;
+}
+.text-answer::placeholder { color:var(--muted); font-style:italic; }
+.text-answer:focus { background:rgba(26,26,38,0.95); }
+
 /* ── RESULT SCREEN ── */
 #s-result {
   align-items:center; justify-content:center;
@@ -518,6 +538,18 @@ function renderSession(){
         <div class="qtext">${esc(q.question)}</div>
       </div>
       ${code}
+      <div class="editor-wrap">
+        <div class="editor-label">
+          <span>// Твой ответ (Swift)</span>
+          <span style="color:var(--muted);font-size:9px">Tab = 4 пробела</span>
+        </div>
+        <div class="swift-editor-container">
+          <textarea class="swift-editor" id="ed-${q.id}" spellcheck="false" autocorrect="off" autocapitalize="off"
+            placeholder="// Пиши ответ здесь..."
+            oninput="saveAnswer('${q.id}',this.value)"
+            onkeydown="handleTab(event)"></textarea>
+        </div>
+      </div>
       <div class="mark-row">
         <div class="mark-chk" id="chk-${q.id}" onclick="toggleDone('${q.id}')"></div>
         <span class="mark-label" onclick="toggleDone('${q.id}')">Отметить как выполненное</span>
@@ -535,6 +567,14 @@ function renderSession(){
       <div class="qcard-top">
         <div class="qnum">${i+1}</div>
         <div class="qtext">${esc(q.question)}</div>
+      </div>
+      <div class="text-answer-wrap">
+        <div class="text-answer-label">
+          <span>// Твой ответ</span>
+        </div>
+        <textarea class="text-answer" id="ed-${q.id}" spellcheck="true"
+          placeholder="Напиши свой ответ здесь..."
+          oninput="saveAnswer('${q.id}',this.value)"></textarea>
       </div>
       <div class="mark-row">
         <div class="mark-chk" id="chk-${q.id}" onclick="toggleDone('${q.id}')"></div>
@@ -675,7 +715,7 @@ function showAnswers(){
       <pre class="code-pre">${highlightSwift(item.starterJSONCode.join('\n'))}</pre>` : '';
 
     const userAns = userAnswers[item.id];
-    const userBlock = (item._type==='task' && userAns && userAns.trim()) ? `
+    const userBlock = (userAns && userAns.trim()) ? `
       <div class="user-answer-lbl">// Твой ответ</div>
       <div class="user-answer-txt">${esc(userAns)}</div>` : '';
 
