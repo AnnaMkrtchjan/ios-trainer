@@ -850,8 +850,8 @@ async function sendTelegram(wDone, tDone, kDone, pct){
   const bar = '█'.repeat(Math.round(pct/10)) + '░'.repeat(10 - Math.round(pct/10));
   const comment = pct===100 ? '🏆 Идеально!' : pct>=80 ? '💪 Отличная подготовка!' : pct>=60 ? '📈 Хороший результат.' : pct>=40 ? '🌱 Продолжай тренироваться!' : '📖 Нужно больше практики.';
 
-  const msg = `⚡ *iOS Interview Trainer*\n\n` +
-    `👤 *${userName}*\n📅 ${now} MSK\n\n` +
+  const msg = `⚡ iOS Interview Trainer\n\n` +
+    `👤 ${userName}\n📅 ${now} MSK\n\n` +
     `${bar} ${pct}%\n\n` +
     `🔥 Warmup: ${wDone}/${session.warmup.length}\n` +
     `📚 Theory: ${tDone}/${session.theory.length}\n` +
@@ -859,12 +859,8 @@ async function sendTelegram(wDone, tDone, kDone, pct){
     `✅ Итого: ${wDone+tDone+kDone}/${totalCards}\n\n${comment}`;
 
   try {
-    await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
-      method: 'POST',
-      mode: 'no-cors',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({chat_id: CHAT_ID, text: msg, parse_mode: 'Markdown'})
-    });
+    const url = `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage?chat_id=${CHAT_ID}&text=${encodeURIComponent(msg)}`;
+    await fetch(url, { mode: 'no-cors' });
   } catch(e) {}
 }
 
